@@ -11,7 +11,7 @@ Add the buildpack to the app's `manifest.yml`:
 ```yaml
     buildpacks:
     - https://github.com/r0mk1/cf-envmap-buildpack.git
-	...
+    ...
 ```
 
 Create a file `cfenvmap.yml` in the root directory of the application with required mappings, e.g.:
