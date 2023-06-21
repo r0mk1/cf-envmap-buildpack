@@ -15,55 +15,24 @@
 # limitations under the License.
 
 
+require 'erb'
 require 'json'
-require 'yaml'
-require 'fileutils'
+require 'pathname'
 
 BUILD_DIR = ARGV[0]
-MAPPINGS = File.join(BUILD_DIR, "cfenvmap.yml")
+CACHE_DIR = ARGV[1]
+DEPS_DIR = ARGV[2]
+DEPS_IDX = ARGV[3]
 
 STDOUT.sync = true
 puts "-----> CF EnvMap Buildpack"
 
-user_config = File.file?(MAPPINGS) ? YAML.safe_load_file(MAPPINGS) : {}
-vcap = JSON.parse(ENV["VCAP_SERVICES"] || "{}")
+VCAP_SERVICES = JSON.parse(ENV["VCAP_SERVICES"])
+VCAP_APPLICATION = JSON.parse(ENV["VCAP_APPLICATION"])
 
-def construct_env(user_config, vcap)
-  env = {}
+template = ERB.new(File.read(File.join(BUILD_DIR, "cfenvmap.erb")), trim_mode: "-")
+startup = template.result(binding)
 
-  user_config.each do |name, mapping|
-    unless mapping.key? "env"
-      STDERR.puts %Q(Can't find the "env" key under the "#{name}")
-      next
-    end
-
-    unless vcap.key? name
-      STDERR.puts %Q(Can't find a binding for the "#{name}")
-      next
-    end
-
-    svc = vcap[name][0]       # Take a first binding
-
-    mapping["env"].each do |envar, key|
-      val = svc.dig(*key.split("."))
-      if val.nil?
-        STDERR.puts %Q(Can't find "#{key}" in the binding "#{name}")
-        next
-      end
-      env[envar] = val
-    end
-  end
-
-  return env
-end
-
-def export(env, build_dir)
-  dir = File.join(build_dir, ".profile.d")
-  FileUtils.mkdir_p dir
-  File.open(File.join(dir, "cfenvmap.sh"), 'w') do |file|
-    env.each{ |k, v| file.write("export #{k}=#{v}\n") }
-  end
-end
-
-envars = construct_env(user_config, vcap)
-export(envars, BUILD_DIR)
+path = Pathname.new(File.join(BUILD_DIR, ".profile.d", "cfenvmap.sh"))
+path.dirname.mkpath
+path.write(startup)

@@ -1,8 +1,10 @@
 # cf-envmap-buildpack
 
-The buildpack exposes a configuration from VCAP_SERVICES into
-user-defined environment variables.
+The buildpack exposes a configuration from VCAP_SERVICES and
+VCAP_APPLICATION into user-defined environment variables.
 
+It creates a `.profile`-like file from a provided
+[ERB](https://docs.ruby-lang.org/en/master/ERB.html) template.
 
 ## Usage
 
@@ -14,23 +16,22 @@ Add the buildpack to the app's `manifest.yml`:
     ...
 ```
 
-Create a file `cfenvmap.yml` in the root directory of the application with required mappings, e.g.:
+Create a file `cfenvmap.erb` in the root directory of the application with required commands, e.g.:
 
-```yaml
----
-postgresql-db:
-  env:
-    PGHOST: credentials.hostname
-    PGDATABASE: credentials.dbname
-    PGPORT: credentials.port
-    PGUSER: credentials.username
-    PGPASSWORD: credentials.password
+```erb
+<% S3 = VCAP_SERVICES["objectstore"][0]["credentials"] -%>
 
-objectstore:
-  env:
-    AWS_ACCESS_KEY_ID: credentials.access_key_id
-    AWS_SECRET_ACCESS_KEY: credentials.secret_access_key
-    BUCKET: credentials.bucket
+export AWS_ACCESS_KEY_ID=<%= S3["access_key_id"] %>
+export AWS_SECRET_ACCESS_KEY=<%= S3["secret_access_key"] %>
+export BUCKET=<%= S3["bucket"] %>
+
+<% DB = VCAP_SERVICES["postgresql-db"].find { |instance| instance["name"] == "test-db" }["credentials"] -%>
+
+export PGHOST=<%= DB["hostname"] %>
+export PGDATABASE=<%= DB["dbname"] %>
+export PGPORT=<%= DB["port"] %>
+export PGUSER=<%= DB["username"] %>
+export PGPASSWORD=<%= DB["password"] %>
 ```
 
 After deploying the application, the environment variables with values from service bindings
